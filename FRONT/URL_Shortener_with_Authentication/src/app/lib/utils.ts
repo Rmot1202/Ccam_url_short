@@ -2,7 +2,8 @@ export const API_BASE = "http://localhost:8000";
 export const HOUR = 3600_000;
 export const DAY = 86_400_000;
 
-export function formatTTL(expiresAt: number): string {
+export function formatTTL(expiresAt: number | null): string {
+  if (expiresAt === null) return "never expires";
   const diff = expiresAt - Date.now();
   if (diff <= 0) return "expired";
   const h = Math.floor(diff / HOUR);

@@ -1,5 +1,5 @@
 import { Link2 } from "lucide-react";
-import type { Page, User } from "../../lib/types";
+import type { User } from "../../lib/types";
 import LoginForm from "./LoginForm";
 import SignupForm from "./SignupForm";
 
@@ -53,7 +53,7 @@ export default function AuthPage({
         </div>
 
         <p className="mt-6 text-center text-[10px] font-mono text-muted-foreground/50">
-          links are TTL-cached via Redis · no tracking
+          links are TTL-cached via Redis
         </p>
       </div>
     </div>

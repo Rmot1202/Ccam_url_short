@@ -16,7 +16,7 @@ export default function SignupForm({ onAuth }: { onAuth: (user: User) => void })
     setError("");
 
     if (!email.includes("@")) return setError("Valid email required");
-    if (password.length < 6) return setError("Password must be ≥ 6 characters");
+    if (password.length < 8) return setError("Password must be at least 8 characters");
     if (!name.trim()) return setError("Name required");
 
     setLoading(true);
@@ -68,7 +68,7 @@ export default function SignupForm({ onAuth }: { onAuth: (user: User) => void })
             type={showPw ? "text" : "password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
+            placeholder="password"
             className="w-full bg-input-background border border-border rounded-sm px-3 py-2.5 pr-10 font-mono text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition-colors"
           />
           <button
@@ -92,7 +92,7 @@ export default function SignupForm({ onAuth }: { onAuth: (user: User) => void })
         disabled={loading}
         className="w-full py-2.5 font-mono font-semibold text-sm bg-primary text-primary-foreground rounded-sm hover:bg-primary/90 active:bg-primary/80 transition-colors disabled:opacity-50"
       >
-        {loading ? "authenticating…" : "create account →"}
+        {loading ? "authenticating..." : "create account"}
       </button>
     </form>
   );

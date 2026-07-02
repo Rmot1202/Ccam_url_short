@@ -11,16 +11,29 @@ async function readJson(res: Response) {
   }
 }
 
+function mapShortLink(link: any): ShortLink {
+  return {
+    shortcode: link.short_code ?? link.shortcode,
+    originalUrl: link.original_url ?? link.originalUrl,
+    createdAt: link.created_at ? new Date(link.created_at).getTime() : Date.now(),
+    expiresAt: link.expires_at ? new Date(link.expires_at).getTime() : null,
+    clicks: link.click_count ?? link.clicks ?? 0,
+    userId: link.user_name ?? link.userId ?? "u1",
+    cachedInRedis: Boolean(link.cached_in_redis ?? link.cachedInRedis),
+    lastAccessed: link.last_accessed ? new Date(link.last_accessed).getTime() : undefined,
+  };
+}
+
 export async function apiMe(): Promise<User | null> {
   const res = await fetch(`${API_BASE}/auth/me`, { credentials: "include" });
   if (!res.ok) return null;
 
   const data = await readJson(res);
   return {
-    id: String(data.id ?? "u1"),
+    id: String(data.user_name ?? data.id ?? "u1"),
     email: data.email ?? "",
     name: data.user_name ?? data.name ?? data.email?.split("@")[0] ?? "user",
-    createdAt: Date.now(),
+    createdAt: data.created_at ? new Date(data.created_at).getTime() : Date.now(),
   };
 }
 
@@ -60,18 +73,7 @@ export async function apiListLinks(): Promise<ShortLink[]> {
   if (!res.ok) return [];
 
   const data = await readJson(res);
-  return Array.isArray(data)
-    ? data.map((l: any) => ({
-        shortcode: l.short_code ?? l.shortcode,
-        originalUrl: l.original_url ?? l.originalUrl,
-        createdAt: l.created_at ? new Date(l.created_at).getTime() : Date.now(),
-        expiresAt: l.expires_at ? new Date(l.expires_at).getTime() : Date.now() + 86400_000,
-        clicks: l.click_count ?? l.clicks ?? 0,
-        userId: "u1",
-        cachedInRedis: Boolean(l.cached_in_redis ?? l.cachedInRedis),
-        lastAccessed: l.last_accessed ? new Date(l.last_accessed).getTime() : undefined,
-      }))
-    : [];
+  return Array.isArray(data) ? data.map(mapShortLink) : [];
 }
 
 export async function apiCreateLink(payload: LinkCreatePayload) {
@@ -83,16 +85,18 @@ export async function apiCreateLink(payload: LinkCreatePayload) {
       original_url: payload.original_url,
       custom_alias: payload.custom_alias,
       expires_at: payload.expires_at,
+      warm_cache: payload.warm_cache ?? true,
     }),
   });
 
   const data = await readJson(res);
-  return { ok: res.ok, data };
+  return { ok: res.ok, data: res.ok ? mapShortLink(data) : data };
 }
 
 export async function apiDeleteLink(shortcode: string) {
-  await fetch(`${API_BASE}/${shortcode}`, {
+  const res = await fetch(`${API_BASE}/${shortcode}`, {
     method: "DELETE",
     credentials: "include",
   });
+  return res.ok;
 }

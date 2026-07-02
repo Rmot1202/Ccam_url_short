@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircle, ChevronRight, Link2, LogOut, Plus, XCircle } from "lucide-react";
+import { CheckCircle, LogOut, Plus, XCircle } from "lucide-react";
 import type { ShortLink, TabView, User } from "../../lib/types";
 import { apiDeleteLink, apiListLinks } from "../../lib/api";
 import LinkRow from "./LinkRow";
@@ -28,15 +28,17 @@ export default function Dashboard({
     return () => clearInterval(id);
   }, []);
 
-  const activeLinks = links.filter((l) => Date.now() <= l.expiresAt);
-  const expiredLinks = links.filter((l) => Date.now() > l.expiresAt);
+  const activeLinks = links.filter((l) => l.expiresAt === null || Date.now() <= l.expiresAt);
+  const expiredLinks = links.filter((l) => l.expiresAt !== null && Date.now() > l.expiresAt);
   const displayed = tab === "active" ? activeLinks : expiredLinks;
 
   const handleDelete = async (id: string) => {
     const target = links.find((x) => x.shortcode === id);
     if (!target) return;
-    await apiDeleteLink(target.shortcode);
-    setLinks((prev) => prev.filter((x) => x.shortcode !== id));
+    const ok = await apiDeleteLink(target.shortcode);
+    if (ok) {
+      setLinks((prev) => prev.filter((x) => x.shortcode !== id));
+    }
   };
 
   const handleCreate = (link: ShortLink) => {
@@ -121,7 +123,7 @@ export default function Dashboard({
 
           {displayed.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
-              {tab === "active" ? "No active links — create one above" : "No expired links"}
+              {tab === "active" ? "No active links - create one above" : "No expired links"}
             </div>
           ) : (
             <div className="space-y-3">

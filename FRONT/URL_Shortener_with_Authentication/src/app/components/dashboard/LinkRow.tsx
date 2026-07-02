@@ -13,7 +13,7 @@ export default function LinkRow({
   onDelete: (id: string) => void;
   baseUrl: string;
 }) {
-  const isExpired = Date.now() > link.expiresAt;
+  const isExpired = link.expiresAt !== null && Date.now() > link.expiresAt;
   const shortUrl = `${baseUrl}/${link.shortcode}`;
 
   return (
@@ -69,7 +69,7 @@ export default function LinkRow({
               <ExternalLink size={13} />
             </a>
             <button
-              onClick={() => onDelete(link.id)}
+              onClick={() => onDelete(link.shortcode)}
               className="text-muted-foreground hover:text-destructive transition-colors"
             >
               <Trash2 size={13} />

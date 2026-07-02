@@ -1,15 +1,15 @@
-from datetime import datetime, timezone
-import time
 import logging
-from fastapi import FastAPI, Depends, HTTPException, status, Cookie, Response, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse, JSONResponse
-from sqlalchemy.orm import Session
+import time
 
-from .database import Base, engine, get_db
-from . import models, schemas, crud
+from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, Response, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, RedirectResponse
+from sqlalchemy.orm import Session
+from .tasks import track_click
+
+from . import crud, models, schemas, services
 from .auth import create_access_token, decode_access_token
-from .redis_client import r
+from .database import Base, engine, get_db
 
 Base.metadata.create_all(bind=engine)
 
@@ -20,6 +20,7 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger("url_shortener")
+
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -38,6 +39,7 @@ async def log_requests(request: Request, call_next):
     )
     return response
 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -45,6 +47,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 def get_current_user(access_token: str | None = Cookie(default=None), db: Session = Depends(get_db)):
     if not access_token:
@@ -64,12 +67,14 @@ def get_current_user(access_token: str | None = Cookie(default=None), db: Sessio
 
     return user
 
+
 @app.post("/auth/signup", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
 def signup(payload: schemas.UserCreate, db: Session = Depends(get_db)):
     user = crud.create_user(db, payload)
     if not user:
-        raise HTTPException(status_code=409, detail="Email already exists")
+        raise HTTPException(status_code=409, detail="Email or username already exists")
     return user
+
 
 @app.post("/auth/login")
 def login(payload: schemas.UserLogin, db: Session = Depends(get_db)):
@@ -90,14 +95,17 @@ def login(payload: schemas.UserLogin, db: Session = Depends(get_db)):
     )
     return response
 
+
 @app.post("/auth/logout")
 def logout(response: Response):
     response.delete_cookie(key="access_token", path="/")
     return {"message": "Logged out"}
 
+
 @app.get("/auth/me", response_model=schemas.UserResponse)
 def me(current_user=Depends(get_current_user)):
     return current_user
+
 
 @app.post("/shorten", response_model=schemas.LinkResponse, status_code=status.HTTP_201_CREATED)
 def shorten_link(
@@ -106,62 +114,52 @@ def shorten_link(
     current_user=Depends(get_current_user),
 ):
     try:
-        return crud.create_link(db, current_user.user_name, payload)
-    except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        return services.create_short_link(db, current_user.user_name, payload)
+    except services.AliasConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except (services.InvalidAliasError, services.InvalidExpirationError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
 
 @app.get("/links", response_model=list[schemas.LinkResponse])
 def list_links(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    return crud.get_all_links(db, current_user.user_name)
+    return services.list_short_links(db, current_user.user_name)
+
 
 @app.get("/{short_code}")
 def redirect_link(short_code: str, db: Session = Depends(get_db)):
-    link = crud.get_link_by_code(db, short_code)
-    if not link:
+    try:
+        destination_url = services.resolve_redirect(db, short_code)
+    except services.LinkExpiredError as exc:
+        raise HTTPException(status_code=410, detail=str(exc)) from exc
+
+    if not destination_url:
         raise HTTPException(status_code=404, detail="Short code not found")
 
-    if not link.is_active:
-        raise HTTPException(status_code=410, detail="Link expired or inactive")
+    track_click.delay(short_code)
+    return RedirectResponse(url=destination_url, status_code=307)
 
-    now = datetime.now(timezone.utc)
-    expires_at = None
-
-    if link.expires_at:
-        expires_at = link.expires_at
-        if expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=timezone.utc)
-
-        if expires_at <= now:
-            link.is_active = False
-            db.commit()
-            raise HTTPException(status_code=410, detail="Link expired or inactive")
-
-    cached_url = r.get(short_code)
-    if cached_url:
-        crud.increment_click(db, link)
-        return RedirectResponse(url=cached_url, status_code=307)
-
-    crud.increment_click(db, link)
-    ttl = max(int((expires_at - now).total_seconds()), 60) if expires_at else 3600
-    r.set(short_code, link.original_url, ex=ttl)
-    return RedirectResponse(url=link.original_url, status_code=307)
 
 @app.get("/stats/{short_code}", response_model=schemas.LinkResponse)
 def link_stats(short_code: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    link = crud.get_link_by_code(db, short_code)
+    link = services.get_link_stats(db, short_code)
     if not link:
         raise HTTPException(status_code=404, detail="Short code not found")
     if link.user_name != current_user.user_name:
         raise HTTPException(status_code=403, detail="Not allowed")
     return link
 
+
 @app.delete("/{short_code}")
 def delete_link(short_code: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    link = crud.get_link_by_code(db, short_code)
+    link = services.get_link_stats(db, short_code)
     if not link:
         raise HTTPException(status_code=404, detail="Short code not found")
     if link.user_name != current_user.user_name:
         raise HTTPException(status_code=403, detail="Not allowed")
 
-    crud.delete_link(db, short_code)
+    services.delete_short_link(db, short_code)
     return {"detail": "Link deleted successfully"}
+

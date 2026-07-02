@@ -12,6 +12,16 @@ const TTL_PRESETS = [
   { label: "30 days", value: 2592000 },
 ];
 
+type FormErrors = { url?: string; shortcode?: string; ttl?: string; form?: string };
+
+function getErrorMessage(data: any) {
+  if (typeof data?.detail === "string") return data.detail;
+  if (Array.isArray(data?.detail) && data.detail.length > 0) {
+    return data.detail.map((item: any) => item.msg).filter(Boolean).join(", ");
+  }
+  return "Could not create link";
+}
+
 export default function CreateModal({
   onClose,
   onCreate,
@@ -27,20 +37,23 @@ export default function CreateModal({
   const [useCustom, setUseCustom] = useState(false);
   const [customSeconds, setCustomSeconds] = useState("3600");
   const [warmCache, setWarmCache] = useState(true);
-  const [errors, setErrors] = useState<{ url?: string; shortcode?: string; ttl?: string }>({});
+  const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
 
   const effectiveTtl = useCustom ? Number(customSeconds) : ttl;
 
   const validate = () => {
-    const e: { url?: string; shortcode?: string; ttl?: string } = {};
+    const e: FormErrors = {};
     try {
-      new URL(url);
+      const parsed = new URL(url);
+      if (!["http:", "https:"].includes(parsed.protocol)) {
+        e.url = "Use an HTTP or HTTPS URL";
+      }
     } catch {
       e.url = "Invalid URL";
     }
-    if (!/^[a-z0-9_-]{2,32}$/.test(shortcode)) {
-      e.shortcode = "2–32 chars, lowercase letters, digits, - or _";
+    if (!/^[a-z0-9_-]{2,20}$/.test(shortcode)) {
+      e.shortcode = "2-20 chars: lowercase letters, digits, - or _";
     }
     if (!Number.isInteger(effectiveTtl) || effectiveTtl < 60) {
       e.ttl = "TTL must be at least 60 seconds";
@@ -61,19 +74,15 @@ export default function CreateModal({
         original_url: url,
         custom_alias: shortcode,
         expires_at: expiresAt,
+        warm_cache: warmCache,
       });
 
-      if (!res.ok) return;
+      if (!res.ok) {
+        setErrors({ form: getErrorMessage(res.data) });
+        return;
+      }
 
-      onCreate({
-        shortcode,
-        originalUrl: url,
-        createdAt: Date.now(),
-        expiresAt: Date.now() + effectiveTtl * 1000,
-        clicks: 0,
-        userId: "u1",
-        cachedInRedis: warmCache,
-      });
+      onCreate(res.data);
     } finally {
       setSubmitting(false);
     }
@@ -178,6 +187,18 @@ export default function CreateModal({
 
             {errors.ttl && <p className="mt-1 text-sm text-red-500">{errors.ttl}</p>}
           </div>
+
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={warmCache}
+              onChange={(e) => setWarmCache(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Warm Redis cache on create
+          </label>
+
+          {errors.form && <p className="text-sm text-red-500">{errors.form}</p>}
 
           <div className="flex justify-end gap-3 pt-2">
             <button

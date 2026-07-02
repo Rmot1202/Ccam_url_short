@@ -9,7 +9,7 @@ export interface ShortLink {
   shortcode: string;
   originalUrl: string;
   createdAt: number;
-  expiresAt: number;
+  expiresAt: number | null;
   clicks: number;
   userId: string;
   cachedInRedis: boolean;
@@ -22,7 +22,7 @@ export type TabView = "active" | "expired";
 export interface LinkCreatePayload {
   original_url: string;
   custom_alias?: string;
-  expires_at: string;
+  expires_at?: string | null;
   warm_cache?: boolean;
 }
 

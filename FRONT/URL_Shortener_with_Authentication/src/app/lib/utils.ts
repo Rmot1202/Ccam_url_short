@@ -1,4 +1,5 @@
-export const API_BASE = "http://localhost:8000";
+//export const API_BASE = "http://localhost:8000";
+export const API_BASE = "https://ccam-url-short.onrender.com";
 export const HOUR = 3600_000;
 export const DAY = 86_400_000;
 

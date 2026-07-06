@@ -91,8 +91,8 @@ def login(payload: schemas.UserLogin, db: Session = Depends(get_db)):
         key="access_token",
         value=token,
         httponly=True,
-        secure=False,
-        samesite="lax",
+        secure=True,
+        samesite="none",
         path="/",
         max_age=3600,
     )
@@ -100,10 +100,10 @@ def login(payload: schemas.UserLogin, db: Session = Depends(get_db)):
 
 
 @app.post("/auth/logout")
-def logout(response: Response):
+def logout():
+    response = JSONResponse(content={"message": "Logged out"})
     response.delete_cookie(key="access_token", path="/")
-    return {"message": "Logged out"}
-
+    return response
 
 @app.get("/auth/me", response_model=schemas.UserResponse)
 def me(current_user=Depends(get_current_user)):

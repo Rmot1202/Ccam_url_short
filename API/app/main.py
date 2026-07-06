@@ -95,6 +95,7 @@ def login(payload: schemas.UserLogin, db: Session = Depends(get_db)):
         samesite="none",
         path="/",
         max_age=3600,
+        domain=".onrender.com"
     )
     return response
 
@@ -102,7 +103,7 @@ def login(payload: schemas.UserLogin, db: Session = Depends(get_db)):
 @app.post("/auth/logout")
 def logout():
     response = JSONResponse(content={"message": "Logged out"})
-    response.delete_cookie(key="access_token", path="/")
+    response.delete_cookie(key="access_token", path="/", domain=".onrender.com", samesite="none")
     return response
 
 @app.get("/auth/me", response_model=schemas.UserResponse)

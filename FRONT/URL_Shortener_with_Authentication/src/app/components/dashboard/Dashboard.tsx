@@ -19,9 +19,9 @@ export default function Dashboard({
   const [showCreate, setShowCreate] = useState(false);
   const [tick, setTick] = useState(0);
 
-  useEffect(() => {
-    apiListLinks().then(setLinks);
-  }, []);
+ useEffect(() => {
+  apiListLinks().then(setLinks);
+}, [tick]);
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 30000);
@@ -117,8 +117,6 @@ export default function Dashboard({
 
         <div className="p-4">
           <div className="mb-3 flex items-center justify-between text-xs text-muted-foreground">
-            <span>Auto-refresh every 30s</span>
-            <span key={tick}>tick {tick}</span>
           </div>
 
           {displayed.length === 0 ? (

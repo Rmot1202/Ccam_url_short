@@ -1,11 +1,6 @@
 import { API_BASE } from "./utils";
 import type { AuthPayload, LinkCreatePayload, ShortLink, User } from "./types";
 
-function getAuthHeaders() {
-  const token = typeof window !== "undefined" ? window.localStorage.getItem("access_token") : null;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 async function readJson(res: Response) {
   const text = await res.text();
   if (!text) return {};
@@ -32,7 +27,6 @@ function mapShortLink(link: any): ShortLink {
 export async function apiMe(): Promise<User | null> {
   const res = await fetch(`${API_BASE}/auth/me`, {
     credentials: "include",
-    headers: getAuthHeaders(),
   });
   if (!res.ok) return null;
 
@@ -53,12 +47,8 @@ export async function apiLogin(payload: AuthPayload) {
     body: JSON.stringify({ email: payload.email, password: payload.password }),
   });
 
-  return readJson(res).then((data) => {
-    if (res.ok && data.access_token && typeof window !== "undefined") {
-      window.localStorage.setItem("access_token", data.access_token);
-    }
-    return { ok: res.ok, data };
-  });
+  const data = await readJson(res);
+  return { ok: res.ok, data };
 }
 
 export async function apiSignup(payload: AuthPayload) {
@@ -76,21 +66,15 @@ export async function apiSignup(payload: AuthPayload) {
 }
 
 export async function apiLogout() {
-  if (typeof window !== "undefined") {
-    window.localStorage.removeItem("access_token");
-  }
-
   await fetch(`${API_BASE}/auth/logout`, {
     method: "POST",
     credentials: "include",
-    headers: getAuthHeaders(),
   });
 }
 
 export async function apiListLinks(): Promise<ShortLink[]> {
   const res = await fetch(`${API_BASE}/links`, {
     credentials: "include",
-    headers: getAuthHeaders(),
   });
   if (!res.ok) return [];
 
@@ -102,7 +86,7 @@ export async function apiCreateLink(payload: LinkCreatePayload) {
   const res = await fetch(`${API_BASE}/shorten`, {
     method: "POST",
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       original_url: payload.original_url,
       custom_alias: payload.custom_alias,
@@ -119,7 +103,6 @@ export async function apiDeleteLink(shortcode: string) {
   const res = await fetch(`${API_BASE}/${shortcode}`, {
     method: "DELETE",
     credentials: "include",
-    headers: getAuthHeaders(),
   });
   return res.ok;
 }

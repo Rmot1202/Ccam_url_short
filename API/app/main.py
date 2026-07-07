@@ -55,22 +55,13 @@ app.add_middleware(
 
 
 def get_current_user(
-    request: Request,
     access_token: str | None = Cookie(default=None),
-    authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ):
-    token = None
-
-    if authorization and authorization.startswith("Bearer "):
-        token = authorization.split(" ", 1)[1]
-    elif access_token:
-        token = access_token
-
-    if not token:
+    if not access_token:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    payload = decode_access_token(token)
+    payload = decode_access_token(access_token)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
@@ -92,7 +83,6 @@ def signup(payload: schemas.UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=409, detail="Email or username already exists")
     return user
 
-
 @app.post("/auth/login")
 def login(payload: schemas.UserLogin, db: Session = Depends(get_db)):
     user = crud.authenticate_user(db, payload.email, payload.password)
@@ -100,29 +90,23 @@ def login(payload: schemas.UserLogin, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     token = create_access_token({"sub": user.user_name, "email": user.email})
-    response = JSONResponse(content={"message": "Login successful", "access_token": token})
-    cookie_kwargs = {
-        "key": "access_token",
-        "value": token,
-        "httponly": True,
-        "secure": True,
-        "samesite": "none",
-        "path": "/",
-        "max_age": 3600,
-    }
-    if COOKIE_DOMAIN:
-        cookie_kwargs["domain"] = COOKIE_DOMAIN
-    response.set_cookie(**cookie_kwargs)
+    response = JSONResponse(content={"message": "Login successful"})
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,
+        secure=True,
+        samesite="none",
+        path="/",
+        max_age=3600,
+    )
     return response
 
 
 @app.post("/auth/logout")
 def logout():
     response = JSONResponse(content={"message": "Logged out"})
-    cookie_kwargs = {"key": "access_token", "path": "/", "secure": True}
-    if COOKIE_DOMAIN:
-        cookie_kwargs["domain"] = COOKIE_DOMAIN
-    response.delete_cookie(**cookie_kwargs)
+    response.delete_cookie(key="access_token", path="/")
     return response
 
 @app.get("/auth/me", response_model=schemas.UserResponse)

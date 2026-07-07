@@ -115,6 +115,12 @@ def create_short_link(db: Session, user_name: str, payload: schemas.LinkCreate):
 
 def list_short_links(db: Session, user_name: str):
     links = crud.get_all_links(db, user_name)
+    now = datetime.now(timezone.utc)
+
+    for link in links:
+        if link.is_active and _is_expired(link.expires_at, now):
+            crud.mark_link_inactive(db, link)
+
     return [_annotate_cache_state(link) for link in links]
 
 

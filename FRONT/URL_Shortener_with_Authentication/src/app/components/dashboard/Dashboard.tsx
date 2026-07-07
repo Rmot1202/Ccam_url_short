@@ -13,7 +13,7 @@ export default function Dashboard({
   user: User;
   onLogout: () => void;
 }) {
-  const BASE_URL = "http://localhost:8000";
+  const BASE_URL ="https://ccam-url-short.onrender.com";
   const [links, setLinks] = useState<ShortLink[]>([]);
   const [tab, setTab] = useState<TabView>("active");
   const [showCreate, setShowCreate] = useState(false);

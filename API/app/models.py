@@ -7,6 +7,7 @@ from sqlalchemy import (
     ForeignKey,
     func,
     BigInteger,
+    DateTime,
 )
 from sqlalchemy.orm import relationship
 from .database import Base
@@ -33,7 +34,7 @@ class Link(Base):
     original_url = Column(Text, nullable=False)
     custom_alias = Column(String(50), nullable=True)
     is_active = Column(Boolean, nullable=False, default=True, index=True)
-    expires_at = Column(TIMESTAMP, nullable=True, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True, index=True)
     click_count = Column(BigInteger, nullable=False, default=0)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())

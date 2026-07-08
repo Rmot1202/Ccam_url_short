@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 
 from . import models
 from .auth import hash_password, verify_password
+from datetime import timezone
 
 
 def create_user(db: Session, payload):
@@ -41,6 +42,11 @@ def create_link(
     custom_alias: str | None,
     expires_at,
 ):
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    elif expires_at:
+        expires_at = expires_at.astimezone(timezone.utc)
+
     """Create a short-link row. Business rules live in services.py."""
     link = models.Link(
         short_code=short_code,
